@@ -227,6 +227,59 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return res;
   }
 
+  // ── Llamadas WebRTC (signaling: el gateway sólo retransmite) ─────────
+
+  @SubscribeMessage('call:invite')
+  onCallInvite(
+    @ConnectedSocket() socket: AppSocket,
+    @MessageBody()
+    { toUserId, chatId, video }: { toUserId: string; chatId: string; video: boolean },
+  ) {
+    this.server
+      .to(`user:${toUserId}`)
+      .emit('call:incoming', { fromUserId: socket.data.uid, chatId, video });
+  }
+
+  @SubscribeMessage('call:accept')
+  onCallAccept(
+    @ConnectedSocket() socket: AppSocket,
+    @MessageBody() { toUserId }: { toUserId: string },
+  ) {
+    this.server
+      .to(`user:${toUserId}`)
+      .emit('call:accepted', { fromUserId: socket.data.uid });
+  }
+
+  @SubscribeMessage('call:reject')
+  onCallReject(
+    @ConnectedSocket() socket: AppSocket,
+    @MessageBody() { toUserId }: { toUserId: string },
+  ) {
+    this.server
+      .to(`user:${toUserId}`)
+      .emit('call:rejected', { fromUserId: socket.data.uid });
+  }
+
+  @SubscribeMessage('call:signal')
+  onCallSignal(
+    @ConnectedSocket() socket: AppSocket,
+    @MessageBody() { toUserId, data }: { toUserId: string; data: unknown },
+  ) {
+    this.server
+      .to(`user:${toUserId}`)
+      .emit('call:signal', { fromUserId: socket.data.uid, data });
+  }
+
+  @SubscribeMessage('call:end')
+  onCallEnd(
+    @ConnectedSocket() socket: AppSocket,
+    @MessageBody() { toUserId }: { toUserId: string },
+  ) {
+    this.server
+      .to(`user:${toUserId}`)
+      .emit('call:ended', { fromUserId: socket.data.uid });
+  }
+
   // ── Administración de grupos / chats ─────────────────────────────────
 
   @SubscribeMessage('group:update')
