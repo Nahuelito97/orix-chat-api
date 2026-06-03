@@ -42,14 +42,17 @@ export class BotService implements OnModuleInit {
   async ensureBotChat(userId: string): Promise<string | null> {
     if (!this.ai.enabled || userId === ORIXBOT_ID) return null;
     const chat = await this.chats.getOrCreateDirect(userId, ORIXBOT_ID);
-    const count = await this.prisma.message.count({
-      where: { chatId: chat.id },
-    });
-    if (count === 0) {
-      await this.chats.createMessage(ORIXBOT_ID, chat.id, {
+    // Bienvenida idempotente: id determinístico evita duplicados por reconexión.
+    await this.prisma.message.upsert({
+      where: { id: `welcome-${chat.id}` },
+      update: {},
+      create: {
+        id: `welcome-${chat.id}`,
+        chatId: chat.id,
+        senderId: ORIXBOT_ID,
         text: '¡Hola! 👋 Soy OrixBot. Preguntame lo que necesites sobre OrixChat: grupos, llamadas, reacciones, tema, idioma… ¿En qué te ayudo?',
-      });
-    }
+      },
+    });
     return chat.id;
   }
 

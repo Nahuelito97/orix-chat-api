@@ -23,6 +23,11 @@ export class ChatsController {
     return this.chats.listChats(user.uid);
   }
 
+  @Post('self')
+  createSelf(@CurrentUser() user: AuthUser) {
+    return this.chats.getOrCreateSelf(user.uid);
+  }
+
   @Post('direct')
   createDirect(@CurrentUser() user: AuthUser, @Body() dto: CreateDirectDto) {
     return this.chats.getOrCreateDirect(user.uid, dto.otherId);

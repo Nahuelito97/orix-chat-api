@@ -101,6 +101,7 @@ export class ChatsService {
         return {
           id: chat.id,
           isGroup: chat.isGroup,
+          isSelf: !chat.isGroup && chat.participants.length === 1,
           name: chat.name,
           avatar: chat.avatar,
           createdBy: chat.createdBy,
@@ -150,6 +151,20 @@ export class ChatsService {
   }
 
   // ── Crear / obtener chats ────────────────────────────────────────────
+
+  /** Chat con uno mismo ("Mensajes guardados"). Un solo participante. */
+  async getOrCreateSelf(userId: string) {
+    const existing = await this.prisma.chat.findFirst({
+      where: {
+        isGroup: false,
+        participants: { some: { userId }, every: { userId } },
+      },
+    });
+    if (existing) return existing;
+    return this.prisma.chat.create({
+      data: { isGroup: false, participants: { create: [{ userId }] } },
+    });
+  }
 
   /** Devuelve el chat 1-a-1 con `otherId`, creándolo si no existe. */
   async getOrCreateDirect(userId: string, otherId: string) {
