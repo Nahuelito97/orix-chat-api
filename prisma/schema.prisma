@@ -68,7 +68,8 @@ model Message {
   sender    User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   senderId  String
   text      String?
-  image     String? // URL de Firebase Storage
+  image     String? // URL de Firebase Storage (incluye GIFs)
+  audioUrl  String? // nota de voz
   fileUrl   String? // adjunto no-imagen (doc, pdf, etc.)
   fileName  String? // nombre original del adjunto
   pinnedAt  DateTime? // fijado en el chat

@@ -107,6 +107,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       chatId: string;
       text?: string;
       image?: string;
+      audioUrl?: string;
       fileUrl?: string;
       fileName?: string;
       replyToId?: string;
@@ -116,6 +117,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const message = await this.chats.createMessage(uid, body.chatId, {
       text: body.text,
       image: body.image,
+      audioUrl: body.audioUrl,
       fileUrl: body.fileUrl,
       fileName: body.fileName,
       replyToId: body.replyToId,

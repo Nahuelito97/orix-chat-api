@@ -285,6 +285,7 @@ export class ChatsService {
     data: {
       text?: string;
       image?: string;
+      audioUrl?: string;
       fileUrl?: string;
       fileName?: string;
       replyToId?: string;
@@ -299,6 +300,7 @@ export class ChatsService {
           senderId: userId,
           text: data.text,
           image: data.image,
+          audioUrl: data.audioUrl,
           fileUrl: data.fileUrl,
           fileName: data.fileName,
           replyToId: data.replyToId,
@@ -436,6 +438,7 @@ export class ChatsService {
       sender: m.sender,
       text: m.deletedAt ? null : m.text,
       image: m.deletedAt ? null : m.image,
+      audioUrl: m.deletedAt ? null : m.audioUrl,
       fileUrl: m.deletedAt ? null : m.fileUrl,
       fileName: m.deletedAt ? null : m.fileName,
       pinned: !!m.pinnedAt,
