@@ -56,6 +56,9 @@ model Participant {
   lastDeliveredAt DateTime?
   // Silenciado: no dispara notificaciones para este usuario.
   muted      Boolean   @default(false)
+  // Fijado arriba / archivado, por usuario.
+  pinnedChat Boolean   @default(false)
+  archived   Boolean   @default(false)
 
   @@unique([chatId, userId])
   @@index([userId])

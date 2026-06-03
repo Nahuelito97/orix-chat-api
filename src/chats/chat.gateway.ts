@@ -261,6 +261,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return res;
   }
 
+  @SubscribeMessage('chat:pin')
+  async onPinChat(
+    @ConnectedSocket() socket: AppSocket,
+    @MessageBody() { chatId }: { chatId: string },
+  ) {
+    const uid = socket.data.uid;
+    const res = await this.chats.setChatFlag(uid, chatId, 'pinnedChat');
+    this.server.to(`user:${uid}`).emit('chat:bump', { chatId });
+    return res;
+  }
+
+  @SubscribeMessage('chat:archive')
+  async onArchiveChat(
+    @ConnectedSocket() socket: AppSocket,
+    @MessageBody() { chatId }: { chatId: string },
+  ) {
+    const uid = socket.data.uid;
+    const res = await this.chats.setChatFlag(uid, chatId, 'archived');
+    this.server.to(`user:${uid}`).emit('chat:bump', { chatId });
+    return res;
+  }
+
   // ── Llamadas WebRTC (signaling: el gateway sólo retransmite) ─────────
 
   @SubscribeMessage('call:invite')

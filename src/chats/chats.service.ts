@@ -68,7 +68,7 @@ export class ChatsService {
       },
     });
 
-    return Promise.all(
+    const list = await Promise.all(
       chats.map(async (chat) => {
         const me = chat.participants.find((p) => p.userId === userId)!;
         const others = chat.participants.filter((p) => p.userId !== userId);
@@ -90,6 +90,8 @@ export class ChatsService {
           createdBy: chat.createdBy,
           myRole: me.role,
           muted: me.muted,
+          pinned: me.pinnedChat,
+          archived: me.archived,
           updatedAt: chat.updatedAt,
           // En 1-a-1 el "otro" define nombre/avatar mostrados.
           participants: chat.participants.map((p) => ({
@@ -111,6 +113,24 @@ export class ChatsService {
         };
       }),
     );
+
+    // Fijados primero (el orden por updatedAt ya viene de la query; sort estable).
+    return list.sort((a, b) => Number(b.pinned) - Number(a.pinned));
+  }
+
+  /** Fija/desfija o archiva/desarchiva el chat para el usuario. */
+  async setChatFlag(
+    userId: string,
+    chatId: string,
+    flag: 'pinnedChat' | 'archived',
+  ) {
+    const p = await this.assertParticipant(userId, chatId);
+    const value = !p[flag];
+    await this.prisma.participant.update({
+      where: { chatId_userId: { chatId, userId } },
+      data: { [flag]: value },
+    });
+    return { chatId, [flag]: value };
   }
 
   // ── Crear / obtener chats ────────────────────────────────────────────
