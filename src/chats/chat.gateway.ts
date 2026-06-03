@@ -7,10 +7,11 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Logger, Inject, forwardRef } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { FirebaseService } from '../firebase/firebase.service';
 import { UsersService } from '../users/users.service';
+import { BotService } from '../ai/bot.service';
 import { ChatsService } from './chats.service';
 
 /** Datos que guardamos en cada socket tras autenticar. */
@@ -44,6 +45,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly firebase: FirebaseService,
     private readonly users: UsersService,
     private readonly chats: ChatsService,
+    @Inject(forwardRef(() => BotService))
+    private readonly bot: BotService,
   ) {}
 
   // ── Ciclo de vida ────────────────────────────────────────────────────
@@ -58,6 +61,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.users.touchLastSeen(decoded.uid);
       this.broadcastPresence(decoded.uid, true);
       this.logger.log(`conectado ${decoded.uid}`);
+      // Asegura el chat de ayuda con OrixBot y refresca la lista.
+      const botChatId = await this.bot.ensureBotChat(decoded.uid);
+      if (botChatId) {
+        this.server
+          .to(`user:${decoded.uid}`)
+          .emit('chat:bump', { chatId: botChatId });
+      }
     } catch {
       socket.disconnect();
     }
@@ -126,7 +136,31 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`chat:${body.chatId}`).emit('message:new', message);
     // A la lista de chats de cada participante (reordenar + no-leído).
     await this.bumpChatList(body.chatId);
+    // Si OrixBot participa, que responda (sin bloquear el ack).
+    void this.handleBot(body.chatId, uid);
     return message;
+  }
+
+  /** Genera la respuesta de OrixBot si participa del chat. */
+  private async handleBot(chatId: string, senderUid: string) {
+    const botId = await this.bot.botParticipant(chatId, senderUid);
+    if (!botId) return;
+    this.server
+      .to(`chat:${chatId}`)
+      .emit('typing', { chatId, userId: botId, typing: true });
+    try {
+      const message = await this.bot.reply(chatId);
+      if (message) {
+        this.server.to(`chat:${chatId}`).emit('message:new', message);
+        await this.bumpChatList(chatId);
+      }
+    } catch (err) {
+      this.logger.error(`OrixBot falló: ${String(err)}`);
+    } finally {
+      this.server
+        .to(`chat:${chatId}`)
+        .emit('typing', { chatId, userId: botId, typing: false });
+    }
   }
 
   @SubscribeMessage('message:edit')
@@ -233,7 +267,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   onCallInvite(
     @ConnectedSocket() socket: AppSocket,
     @MessageBody()
-    { toUserId, chatId, video }: { toUserId: string; chatId: string; video: boolean },
+    {
+      toUserId,
+      chatId,
+      video,
+    }: { toUserId: string; chatId: string; video: boolean },
   ) {
     this.server
       .to(`user:${toUserId}`)
