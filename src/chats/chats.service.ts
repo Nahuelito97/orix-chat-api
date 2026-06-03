@@ -25,9 +25,25 @@ const messageInclude = {
   },
 } satisfies Prisma.MessageInclude;
 
+/** Filtro: mensajes no expirados (temporales). */
+const NOT_EXPIRED = (): Prisma.MessageWhereInput => ({
+  OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+});
+
 @Injectable()
 export class ChatsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {
+    this.startExpiryCleanup();
+  }
+
+  /** Borra periódicamente los mensajes temporales vencidos. */
+  private startExpiryCleanup() {
+    setInterval(() => {
+      void this.prisma.message
+        .deleteMany({ where: { expiresAt: { lte: new Date() } } })
+        .catch(() => {});
+    }, 60_000);
+  }
 
   // ── Helpers de autorización ──────────────────────────────────────────
 
@@ -285,7 +301,7 @@ export class ChatsService {
   ) {
     await this.assertParticipant(userId, chatId);
     const items = await this.prisma.message.findMany({
-      where: { chatId },
+      where: { chatId, ...NOT_EXPIRED() },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -309,9 +325,14 @@ export class ChatsService {
       fileUrl?: string;
       fileName?: string;
       replyToId?: string;
+      ttlSeconds?: number; // mensaje temporal
     },
   ) {
     await this.assertParticipant(userId, chatId);
+    const expiresAt =
+      data.ttlSeconds && data.ttlSeconds > 0
+        ? new Date(Date.now() + data.ttlSeconds * 1000)
+        : null;
 
     const [message] = await this.prisma.$transaction([
       this.prisma.message.create({
@@ -324,6 +345,7 @@ export class ChatsService {
           fileUrl: data.fileUrl,
           fileName: data.fileName,
           replyToId: data.replyToId,
+          expiresAt,
         },
         include: messageInclude,
       }),
@@ -423,12 +445,57 @@ export class ChatsService {
         chatId,
         deletedAt: null,
         text: { contains: q, mode: 'insensitive' },
+        ...NOT_EXPIRED(),
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: messageInclude,
     });
     return items.map((m) => this.shapeMessage(m));
+  }
+
+  /** Busca mensajes en TODOS los chats del usuario (búsqueda global). */
+  async searchGlobal(userId: string, query: string) {
+    const q = query.trim();
+    if (!q) return [];
+    const items = await this.prisma.message.findMany({
+      where: {
+        deletedAt: null,
+        text: { contains: q, mode: 'insensitive' },
+        ...NOT_EXPIRED(),
+        chat: { participants: { some: { userId } } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      include: {
+        sender: { select: { id: true, username: true, name: true } },
+        chat: {
+          select: {
+            id: true,
+            isGroup: true,
+            name: true,
+            participants: {
+              where: { userId: { not: userId } },
+              take: 1,
+              select: {
+                user: { select: { username: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    return items.map((m) => ({
+      id: m.id,
+      chatId: m.chatId,
+      text: m.text,
+      createdAt: m.createdAt,
+      sender: m.sender,
+      chatName: m.chat.isGroup
+        ? (m.chat.name ?? 'Grupo')
+        : (m.chat.participants[0]?.user.name ||
+          `@${m.chat.participants[0]?.user.username ?? '...'}`),
+    }));
   }
 
   /** Ids de los participantes de un chat (para emitir por socket). */
@@ -464,6 +531,7 @@ export class ChatsService {
       pinned: !!m.pinnedAt,
       deleted: !!m.deletedAt,
       edited: !!m.editedAt,
+      expiresAt: m.expiresAt,
       createdAt: m.createdAt,
       replyTo: m.replyTo
         ? {

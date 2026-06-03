@@ -121,6 +121,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       fileUrl?: string;
       fileName?: string;
       replyToId?: string;
+      ttlSeconds?: number;
     },
   ) {
     const uid = socket.data.uid;
@@ -131,6 +132,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       fileUrl: body.fileUrl,
       fileName: body.fileName,
       replyToId: body.replyToId,
+      ttlSeconds: body.ttlSeconds,
     });
     // A todos los que tienen el chat abierto.
     this.server.to(`chat:${body.chatId}`).emit('message:new', message);

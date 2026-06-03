@@ -82,6 +82,7 @@ model Message {
   replies   Message[] @relation("MessageReply")
   editedAt  DateTime?
   deletedAt DateTime? // borrado lógico: se conserva la fila, se oculta el contenido
+  expiresAt DateTime? // mensaje temporal: se borra al expirar
   createdAt DateTime  @default(now())
 
   reactions Reaction[]

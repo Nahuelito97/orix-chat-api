@@ -42,6 +42,11 @@ export class ChatsController {
     return this.chats.getMessages(user.uid, chatId, cursor);
   }
 
+  @Get('search/global')
+  searchGlobal(@CurrentUser() user: AuthUser, @Query('q') q: string) {
+    return this.chats.searchGlobal(user.uid, q ?? '');
+  }
+
   @Get(':id/search')
   search(
     @CurrentUser() user: AuthUser,
