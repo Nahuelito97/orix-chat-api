@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: orixchat-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orix
+      POSTGRES_PASSWORD: orix
+      POSTGRES_DB: orixchat
+    ports:
+      - '5433:5432'
+    volumes:
+      - orixchat-pgdata:/var/lib/postgresql/data
+
+volumes:
+  orixchat-pgdata:

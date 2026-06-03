@@ -1,0 +1,22 @@
+# dependencies
+/node_modules
+
+# build
+/dist
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+
+# env & secrets
+.env
+.env.*
+!.env.example
+firebase-admin.json
+*-firebase-adminsdk-*.json
+
+# prisma
+/prisma/*.db

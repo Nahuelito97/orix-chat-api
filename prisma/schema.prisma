@@ -1,0 +1,100 @@
+// OrixChat — schema relacional (Postgres).
+// Auth la maneja Firebase; acá `User.id` es el `uid` de Firebase.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id // Firebase uid
+  username  String   @unique
+  name      String   @default("")
+  email     String   @default("")
+  bio       String   @default("Hola, estoy usando OrixChat 👋")
+  avatar    String   @default("")
+  lastSeen  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  participants Participant[]
+  messages     Message[]     @relation("MessageSender")
+  reactions    Reaction[]
+
+  @@index([username])
+}
+
+model Chat {
+  id        String   @id @default(cuid())
+  isGroup   Boolean  @default(false)
+  name      String? // sólo grupos
+  avatar    String? // sólo grupos
+  createdBy String? // uid del creador (grupos)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) // se bumpea con cada mensaje, para ordenar
+
+  participants Participant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+}
+
+model Participant {
+  id         String    @id @default(cuid())
+  chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  role       String    @default("member") // "admin" | "member" (grupos)
+  joinedAt   DateTime  @default(now())
+  // Hasta acá leyó: todo mensaje con createdAt <= lastReadAt está "visto".
+  lastReadAt DateTime?
+  // Hasta acá le llegó (entregado): para el doble check gris.
+  lastDeliveredAt DateTime?
+  // Silenciado: no dispara notificaciones para este usuario.
+  muted      Boolean   @default(false)
+
+  @@unique([chatId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  chat      Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    String
+  sender    User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId  String
+  text      String?
+  image     String? // URL de Firebase Storage
+  fileUrl   String? // adjunto no-imagen (doc, pdf, etc.)
+  fileName  String? // nombre original del adjunto
+  pinnedAt  DateTime? // fijado en el chat
+  // Reply: apunta a otro mensaje del mismo chat.
+  replyTo   Message?  @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replyToId String?
+  replies   Message[] @relation("MessageReply")
+  editedAt  DateTime?
+  deletedAt DateTime? // borrado lógico: se conserva la fila, se oculta el contenido
+  createdAt DateTime  @default(now())
+
+  reactions Reaction[]
+
+  @@index([chatId, createdAt])
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  // Un usuario, un emoji por mensaje (toggle).
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
